@@ -10,42 +10,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check if employee
-        id: check_employee
+      - name: Check if user is a member
+        id: check_member
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.READ_GITHUB_ORG_MEMBERS_TOKEN }}
           result-encoding: string
           script: |
             try {
-              const response = await github.rest.orgs.checkMembershipForUser({
-                org: `github`,
+              const { status } = await github.rest.orgs.checkMembershipForUser({
+                org: 'github',
                 username: context.payload.pull_request.user.login
               });
-
-              if (response.status === 204) {
-                return true;
-              } else {
-                return false;
-              }
+              return status === 204 ? 'true' : 'false';
             } catch (error) {
-              console.log(error);
+              console.error(error);
               return 'false';
             }
 
       - name: Close PR
-        id: close_pr
-        if: ${{ steps.check_employee.outputs.result == 'false' }}
+        if: steps.check_member.outputs.result == 'false'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const body = `This pull request is being automatically closed because we do not accept external contributions to this repository.`;
-
+            const message = `This pull request has been automatically closed because we do not accept external contributions to this repository.`;
+            
             await github.rest.issues.createComment({
               ...context.repo,
               issue_number: context.issue.number,
-              body: body
+              body: message
             });
 
             await github.rest.pulls.update({
